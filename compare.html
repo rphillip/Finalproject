@@ -8,6 +8,7 @@
         <![endif]-->
     <link rel="stylesheet" href="js/jqwidgets/styles/jqx.base.css" type="text/css" />
     <link rel="stylesheet" href="//ajax.googleapis.com/ajax/libs/jqueryui/1.11.1/themes/smoothness/jquery-ui.css" />
+    <link rel="stylesheet" href="css/compare.css" />
      <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
      <script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.11.1/jquery-ui.min.js"></script>
     <script type="text/javascript" src="js/compare.js"></script>
@@ -15,22 +16,21 @@
 </head>
 
 <body id="main">
-<div id="header"></div>
-<div id='jqxgene'></div>
+<div id='jqxgene'></div> Changing gene will remove input sequence
+<div id='jqxgraph1'></div>
 <div id='jqxgraph'></div>
+
+
 <div id="chartContainer" style="width:850px; height:500px;"></div>
-<div id="col5">
-<section id='input'>
-<form id="seqform">
+<form id="seqform" class="inline">
   Sequence Name: <input type="text" name="seqname">
   <input type="submit" text="Compare sequence" id="submit">
-</form>
-Sequence:
 <br>
-<textarea rows="4" cols="50" name="sequence" form="seqform">
-Enter text here...</textarea>
-</section>
-</div>
+Fasta Sequence:
+<br>
+<textarea rows="30" cols="50" name="sequence" form="seqform"></textarea>
+</form>
+
 <div id="footer"></div>
 
 </body>
