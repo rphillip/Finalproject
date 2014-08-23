@@ -119,7 +119,6 @@ $(document).ready( function() {
         data: frmStr,
         success: function(data, textStatus, jqXHR) {
             processJSON(data);
-	    
         },
         error: function(jqXHR, textStatus, errorThrown){
             alert("Failed to perform gene search! textStatus: (" + textStatus +

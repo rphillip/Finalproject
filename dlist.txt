@@ -1,0 +1,1 @@
+inmuscle.in,outmuscle.out,stable.fasta,stable.pim,stable.ph

@@ -5,7 +5,7 @@ use CGI;
 use Config::IniFiles;
 use DBI;
 use JSON;
-use IO::File;
+use IO;
 
 ## create our CGI and TMPL objects
 my $cgi  = new CGI;
@@ -30,6 +30,8 @@ $name = $cgi->param('seqname');
 $seq = $cgi->param('sequence');
 $gterm = $cgi->param('geneterm');
 
+##delete old files
+
 
 ## initialize an empty arrayref to store the search matches
 my $matches = [];
@@ -49,10 +51,7 @@ while (my $row = $dsh->fetchrow_hashref) {
     push @$matches, $row;
 }
 
-$dsh->finish;
-$dbh->disconnect;
-
-open(my $out, ">", 'inmuscle.in');
+open(my $out, ">", 'inmuscle.in') or die "Unable to open file for output: $!\n";
 
 ##output muscle input
 foreach my $part (@{$matches}) {
@@ -60,53 +59,57 @@ foreach my $part (@{$matches}) {
 }
 
 ##if input sequence submitted add to alignment input
-if (defined $seq != undef){
+if (defined $seq){
 	print $out "$seq\n";
 }
 
 close $out;
 
+##call clustalo
 
-
-##call muscle 
-my $muscle = `muscle -in inmuscle.in -out outmuscle.out`;
+my $clustalo = system(`/var/www/html/rsulapa1/compare/clustalo -i inmuscle.in -o outs.o --percent-id --distmat-out=stable.pim --force --full`);
 ##put in input order
-my $stable = `python stable.py inmuscle.in outmuscle.out > stable.fasta`;
+#my $stable = system(`python stable.py inmuscle.in outmuscle.out > stable.fasta`);
 ##call clustal to make percentage matrix
-my $clustal = `clustalw2 -infile=stable.fasta -tree -pim`;
+#my $clustal = system(`/var/www/html/rsulapa1/compare/muscle -infile=stable.fasta -tree -pim`);
 
 ## get PIM values
 my @line = ();
-open(INFILE, "<","stable.pim");
+open(INFILE, "<","stable.pim") or die "Unable to open file for output: $!\n";
+my $skip=0;
 while(<INFILE>)
  {
   chomp($_);
-  if($_ =~ m/1:/){
+  if( $skip == 1){
 	  @line = split (/\s+/);
 	 last;
 	}
+	$skip++;
 }
 close (INFILE);
 
-my $count = 3;
+my $count = 1;
+my $num_3dec;
 ## add percent identity to JSON output
 foreach my $lt (@{$matches}){
-	$lt->{'score'} = $line[$count];	
+	$num_3dec = sprintf '%.2f', $line[$count];
+	$lt->{'score'} = $num_3dec;	
 	$count++;
 }
 
 ## if input sequence submitted add to matches
 my $input ={};
 if (defined $seq ){
-	$input->{'score'}= $line[$count];
+	$num_3dec = sprintf '%.2f', $line[$count];
+	$input->{'score'}= $num_3dec;
 	$input->{'species'}= $name;
 	$input->{'gene'}= $gterm;
 	$input->{'sequence'}= $seq;
-	print $out "$seq\n";
 	push @$matches, $input;
 }
 
-
+$dsh->finish;
+$dbh->disconnect;
 
 ## print the header and JSON data
 
