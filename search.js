@@ -49,7 +49,31 @@ function processJSON( data ) {
     $('#results').show();
 }
 
-
+function CallService() {
+        var txtValue = $("#TextBox1").val();
+        $.ajax({
+            type: "POST", //GET or POST or PUT or DELETE verb
+            url: "Service.svc/getCityList", // Location of the service
+            data: '{"str": "' + txtValue + '"}', //Data sent to server
+            contentType: "application/json; charset=utf-8", // content type sent to server
+            dataType: "json", //Expected data format from server
+            processdata: true, //True or False
+            success: function (msg) {//On Successfull service call
+                if (msg.getCityListResult == '') {
+                    $("#divCity").html("No Data found");
+                }
+                else {
+                    var ddl = $('#ddlCity');
+                    ddl.append("<option value='0'>-select-</option>");
+                    for (var i = 0; i < msg.getCityListResult.length; i++) {
+                        var City = msg.getCityListResult[i].split('~')[0];
+                        var Code = msg.getCityListResult[i].split('~')[1];
+                        ddl.append("<option value='" + Code + "'>" + City + "</options>");
+                    }
+                }
+            }
+        });
+    }
 
 // run our javascript once the page is ready
 $(document).ready( function() {
