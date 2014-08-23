@@ -2,51 +2,64 @@
 
 use strict;
 use CGI;
+use HTML::Template;
 use Config::IniFiles;
 use DBI;
 use JSON;
 
+
 ## create our CGI and TMPL objects
 my $cgi  = new CGI;
+my $tmpl = HTML::Template->new(filename => 'tmpl/search_product.tmpl');
 
-my $cfg = Config::IniFiles->new( -file => "settings.ini" ) || die "failed to read INI f$
+##tie hashes to ini file
+my %ini;
+tie %ini, 'Config::IniFiles', ( -file => "login.ini" );
 
-my $dsn = "DBI:mysql:database=" . $cfg->val('database', 'name') .
-                       ";host=" . $cfg->val('database', 'server') . ";";
-
-my $dbh = DBI->connect($dsn, $cfg->val('database', 'user'), $cfg->val('database', 'pass$
-                       {RaiseError => 1, PrintError => 0});
-
+## add JSON
 my $json = JSON->new->allow_nonref;
 
-my $term = $cgi->param('search_term');
+## search term
+my $term = $cgi->param('term');
+$term = '%'.$term.'%';
+
+##Connect to database by using login.ini
+my $dsn = "DBI:mysql:database=$ini{Login}{Database};host=$ini{Login}{Host}";
+my $dbh = DBI->connect($dsn, $ini{Login}{User}, $ini{Login}{Password}, { RaiseError => 1, PrintError => 1 });
 
 ## initialize an empty arrayref to store the search matches
 my $matches = [];
 
+## retrieve query for gene names and product
 my $qry = qq{
-    SELECT f.uniquename AS locus, product.value AS product
-    FROM feature f
-    JOIN featureprop product ON f.feature_id=product.feature_id
-    JOIN cvterm productprop ON product.type_id=productprop.cvterm_id
-    WHERE productprop.name = ?
-    AND product.value like ?
+ SELECT fproduct.value As id, fproduct.value As label, fproduct.value As value
+ FROM feature f
+ JOIN cvterm polypeptide ON f.type_id=polypeptide.cvterm_id
+ JOIN featureprop fproduct ON f.feature_id=fproduct.feature_id
+ JOIN cvterm productprop ON fproduct.type_id=productprop.cvterm_id
+ WHERE polypeptide.name = ?
+ AND productprop.name = ?
+ AND fproduct.value LIKE ?
+ LIMIT 5
 };
-
+my $polyp = 'polypeptide';
+my $product = 'gene_product_name';
 my $dsh = $dbh->prepare($qry);
+$dsh->execute($polyp,$product,$term);
 
-$dsh->execute('gene_product_name', "\%$term\%");
-
-while (my $row = $dsh->fetchrow_hashref) {
-    ## push the row to the match array
-    push @$matches, $row;
+## push table into
+while (my $row = $dsh->fetchrow_hashref){
+ push @$matches, $row; 
 }
 
 $dsh->finish;
 $dbh->disconnect;
-## print the header and JSON data
-print $cgi->header('application/json');
 
-print $json->encode(
-    { match_count => scalar( @$matches ), matches => $matches }
-);
+## push data to the template
+$tmpl->param( MATCHES => $matches );
+$tmpl->param( MATCH_COUNT => scalar( @$matches ) );
+
+## print the header and template
+print $cgi->header('application/json');
+$json = encode_json $matches;
+print $json;
