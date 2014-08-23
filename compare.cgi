@@ -10,23 +10,26 @@ use IO::File;
 ## create our CGI and TMPL objects
 my $cgi  = new CGI;
 
-my $cfg = Config::IniFiles->new( -file => "settings.ini" ) || die "failed to read INI f$"
+##tie hashes to ini file
+my %ini;
+tie %ini, 'Config::IniFiles', ( -file => "login.ini" );
 
-my $dsn = "DBI:mysql:database=" . $cfg->val('database', 'name') .
-                       ";host=" . $cfg->val('database', 'server') . ";";
-
-my $dbh = DBI->connect($dsn, $cfg->val('database', 'user'), $cfg->val('database', 'pass$'
-                       {RaiseError => 1, PrintError => 0});
-
+## add JSON
 my $json = JSON->new->allow_nonref;
 
-my $gterm = $cgi->param('gene_term');
+##Connect to database by using login.ini
+my $dsn = "DBI:mysql:database=$ini{Login}{Database};host=$ini{Login}{Host}";
+my $dbh = DBI->connect($dsn, $ini{Login}{User}, $ini{Login}{Password}, { RaiseError => 1, PrintError => 1 });
 
-my $sterm1 = $cgi->param('species_term1');
+## set terms for sql search - pass in form data
+my $name = undef;
+my $seq = undef;
+my $gterm =undef;
 
-my $sterm2 = $cgi->param('species_term2');
+$name = $cgi->param('seqname');
+$seq = $cgi->param('sequence');
+$gterm = $cgi->param('geneterm');
 
-my $iterm = $cgi->param('iterm');
 
 ## initialize an empty arrayref to store the search matches
 my $matches = [];
@@ -34,13 +37,12 @@ my $matches = [];
 my $qry = qq{
     SELECT d.gene, d.species, d.sequence
     FROM data d
-    WHERE productprop.name = ?
-    AND product.value like ?
+    WHERE d.gene = ?
 };
 
 my $dsh = $dbh->prepare($qry);
 
-$dsh->execute("$gterm","$sterm1", "$sterm2");
+$dsh->execute($gterm);
 
 while (my $row = $dsh->fetchrow_hashref) {
     ## push the row to the match array
@@ -50,47 +52,64 @@ while (my $row = $dsh->fetchrow_hashref) {
 $dsh->finish;
 $dbh->disconnect;
 
-open(OUTFILE, ">inmuscle.in");
+open(my $out, ">", 'inmuscle.in');
 
 ##output muscle input
-foreach my $part (@matches) {
-        print OUTFILE "$part{sequence}\n";
+foreach my $part (@{$matches}) {
+        print $out "$part->{sequence}\n";
 }
- print OUTFILE "$iterm\n";
 
-close(OUTFILE);
+##if input sequence submitted add to alignment input
+if (defined $seq != undef){
+	print $out "$seq\n";
+}
+
+close $out;
 
 
 
 ##call muscle 
+my $muscle = `muscle -in inmuscle.in -out outmuscle.out`;
+##put in input order
+my $stable = `python stable.py inmuscle.in outmuscle.out > stable.fasta`;
+##call clustal to make percentage matrix
+my $clustal = `clustalw2 -infile=stable.fasta -tree -pim`;
 
-my $muscle = `muscle -in inmuscle.in -out outmuscle.out`
-
-
-##open muscle output
-
-open(INPUTFILE, "<outmuscle.out");
-while(<MYINPUTFILE>)
+## get PIM values
+my @line = ();
+open(INFILE, "<","stable.pim");
+while(<INFILE>)
  {
- # Good practice to store $_ value because
- # subsequent operations may change it.
- my($line) = $_;
+  chomp($_);
+  if($_ =~ m/1:/){
+	  @line = split (/\s+/);
+	 last;
+	}
+}
+close (INFILE);
 
- # Good practice to always strip the trailing
- # newline from the line.
- chomp($line);
+my $count = 3;
+## add percent identity to JSON output
+foreach my $lt (@{$matches}){
+	$lt->{'score'} = $line[$count];	
+	$count++;
+}
 
- # Convert the line to upper case.
- $line =~ tr/[a-z]/[A-Z]/;
+## if input sequence submitted add to matches
+my $input ={};
+if (defined $seq ){
+	$input->{'score'}= $line[$count];
+	$input->{'species'}= $name;
+	$input->{'gene'}= $gterm;
+	$input->{'sequence'}= $seq;
+	print $out "$seq\n";
+	push @$matches, $input;
+}
 
- # Print the line to the screen and add a newline
- print "$line\n";
- }
 
 
 ## print the header and JSON data
-print $cgi->header('application/json');
 
-print $json->encode(
-    { match_count => scalar( @$matches ), matches => $matches }
-);
+print $cgi->header('application/json');
+$json = encode_json $matches;
+print $json;

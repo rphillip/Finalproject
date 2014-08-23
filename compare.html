@@ -21,10 +21,14 @@
 <div id="chartContainer" style="width:850px; height:500px;"></div>
 <div id="col5">
 <section id='input'>
-<form>
-<input type="textarea" name="inseq" id="inseq" rows="10" cols="30">
-<input name="submit" type="submit" id="submit" value="submit">
+<form id="seqform">
+  Sequence Name: <input type="text" name="seqname">
+  <input type="submit" text="Compare sequence" id="submit">
 </form>
+Sequence:
+<br>
+<textarea rows="4" cols="50" name="sequence" form="seqform">
+Enter text here...</textarea>
 </section>
 </div>
 <div id="footer"></div>
